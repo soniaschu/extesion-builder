@@ -12,7 +12,9 @@ import {
   Github,
   MessageSquare,
   Compass,
-  FileArchive
+  FileArchive,
+  Terminal,
+  FileText
 } from 'lucide-react';
 import { ActiveStudioMode, VSCodeThemeConfig, IconThemeConfig, OpenChamberExtensionConfig } from '../types';
 import { THEME_PRESETS } from '../data/presets';
@@ -34,6 +36,7 @@ interface NavbarProps {
   onOpenAiChat: () => void;
   onOpenWorkflowModal: () => void;
   onOpenExportModal: () => void;
+  onOpenReadmeModal: () => void;
   onResetTheme: () => void;
 }
 
@@ -106,6 +109,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveMode('opencode-plugin')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
+              activeMode === 'opencode-plugin'
+                ? 'bg-slate-800 text-indigo-400 shadow-sm border border-slate-700/60'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Terminal className="w-3.5 h-3.5" />
+            <span>OpenCode Plugin</span>
+          </button>
+
+          <button
             onClick={() => setActiveMode('icons')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
               activeMode === 'icons'
@@ -145,6 +160,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Right Actions */}
       <div className="flex items-center gap-2">
+        {/* Automated README Generator Button */}
+        <button
+          onClick={onOpenReadmeModal}
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-900 border border-cyan-800/50 text-xs text-cyan-300 hover:text-cyan-100 hover:border-cyan-500 transition shadow-xs"
+          title="Automated README.md Generator for GitHub"
+        >
+          <FileText className="w-3.5 h-3.5 text-cyan-400" />
+          <span>README.md</span>
+        </button>
+
         {/* Project Wizard Button */}
         <button
           onClick={onOpenWorkflowModal}

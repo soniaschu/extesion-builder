@@ -42,7 +42,7 @@ export interface VSCodeThemeConfig {
   semanticHighlighting?: boolean;
 }
 
-export type IconStyleType = 'minimal' | 'duotone' | 'rounded' | 'sharp';
+export type IconStyleType = 'minimal' | 'duotone' | 'rounded' | 'sharp' | 'pixel';
 
 export interface IconDefinition {
   id: string;
@@ -66,6 +66,13 @@ export interface IconThemeConfig {
   icons: IconDefinition[];
 }
 
+export interface OpenChamberPanelConfig {
+  id: string; // MUST be kebab-case, e.g. 'prompt-booster-panel' or 'test-panel'
+  title: string;
+  entry: string;
+  icon: string;
+}
+
 export interface OpenChamberManifest {
   name: string;
   title: string;
@@ -74,6 +81,7 @@ export interface OpenChamberManifest {
   author: string;
   entry: string;
   icon: string;
+  panel?: OpenChamberPanelConfig;
   permissions: string[];
   categories: string[];
 }
@@ -123,6 +131,34 @@ export interface OpenChamberSession {
   }[];
 }
 
+export interface OpenCodePluginConfig {
+  id: string;
+  name: string;
+  title: string;
+  version: string;
+  description: string;
+  author: string;
+  githubOwner?: string;
+  license: string;
+  templateRepo: string; // 'https://github.com/zenobi-us/opencode-plugin-template'
+  hooks: string[];
+  tools?: {
+    name: string;
+    description: string;
+    parametersSchema: string;
+  }[];
+  files: {
+    packageJson: string;
+    indexTs: string;
+    customToolTs: string;
+    testTs: string;
+    tsconfigJson: string;
+    readmeMd: string;
+    setupSh?: string;
+    ciYml?: string;
+  };
+}
+
 export interface GitHubExportConfig {
   repoName: string;
   owner: string;
@@ -130,9 +166,10 @@ export interface GitHubExportConfig {
   isPrivate: boolean;
   includeActions: boolean;
   includeOpenChamber: boolean;
+  includeOpenCodePlugin?: boolean;
   includeContributing: boolean;
   branch: string;
   token?: string;
 }
 
-export type ActiveStudioMode = 'vscode-theme' | 'openchamber' | 'icons' | 'export' | 'github';
+export type ActiveStudioMode = 'vscode-theme' | 'openchamber' | 'opencode-plugin' | 'icons' | 'export' | 'github';

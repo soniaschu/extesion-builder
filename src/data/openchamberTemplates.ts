@@ -11,6 +11,12 @@ export const OPENCHAMBER_TEMPLATES: Record<string, OpenChamberExtensionConfig> =
       author: 'ChamberCraft Studio',
       entry: 'panel/index.html',
       icon: 'icon.svg',
+      panel: {
+        id: 'prompt-booster-panel',
+        title: 'Prompt & Context Booster',
+        entry: 'panel/index.html',
+        icon: 'icon.svg',
+      },
       permissions: ['session:read', 'session:write', 'project:read', 'prompt:send', 'notifications'],
       categories: ['AI Tools', 'Workflow', 'Productivity'],
     },
@@ -392,6 +398,12 @@ This extension is built for the **OpenChamber Agentic Development Environment** 
       author: 'ChamberCraft Studio',
       entry: 'panel/index.html',
       icon: 'icon.svg',
+      panel: {
+        id: 'diff-inspector-panel',
+        title: 'Diff & Health Inspector',
+        entry: 'panel/index.html',
+        icon: 'icon.svg',
+      },
       permissions: ['session:read', 'diff:read', 'prompt:send', 'notifications'],
       categories: ['Code Review', 'Git', 'Quality'],
     },
@@ -558,6 +570,12 @@ Follows https://docs.openchamber.dev/sdk/.
       author: 'ChamberCraft Studio',
       entry: 'panel/index.html',
       icon: 'icon.svg',
+      panel: {
+        id: 'task-runner-panel',
+        title: 'MCP Task Orchestrator',
+        entry: 'panel/index.html',
+        icon: 'icon.svg',
+      },
       permissions: ['session:read', 'session:write', 'tasks:attach', 'notifications'],
       categories: ['Tasks', 'Automation', 'DevOps'],
     },
@@ -670,6 +688,360 @@ init();`,
     readme: `# MCP Task Orchestrator for OpenChamber
 
 Adds a task management panel to OpenChamber that binds tasks to OpenCode sessions via \`host.attachTask()\`.
+`,
+  },
+  'retro-arcade-hud': {
+    id: 'retro-arcade-hud',
+    manifest: {
+      name: 'openchamber-retro-arcade-hud',
+      title: '16-Bit Retro Arcade HUD',
+      version: '1.0.0',
+      description: 'Chiptune 16-bit retro arcade HUD panel with pixel counters, CRT scanlines, arcade badges, and AI prompt dispatch.',
+      author: 'ChamberCraft Studio',
+      entry: 'panel/index.html',
+      icon: 'icon.svg',
+      panel: {
+        id: 'retro-arcade-hud-panel', // Strictly kebab-case
+        title: '16-Bit Retro Arcade HUD',
+        entry: 'panel/index.html',
+        icon: 'icon.svg',
+      },
+      permissions: ['session:read', 'session:write', 'prompt:send', 'notifications'],
+      categories: ['AI Tools', 'Themes', 'Retro Gaming'],
+    },
+    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges">
+  <rect x="4" y="3" width="6" height="3" fill="#ff0077"/>
+  <rect x="14" y="3" width="6" height="3" fill="#ff0077"/>
+  <rect x="2" y="6" width="20" height="6" fill="#ff0077"/>
+  <rect x="4" y="12" width="16" height="3" fill="#ff0077"/>
+  <rect x="6" y="15" width="12" height="3" fill="#ff0077"/>
+  <rect x="9" y="18" width="6" height="3" fill="#ff0077"/>
+  <rect x="11" y="21" width="2" height="2" fill="#ff0077"/>
+  <rect x="6" y="6" width="3" height="3" fill="#ffd700"/>
+</svg>`,
+    html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>16-Bit Retro Arcade HUD</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="crt-screen">
+  <div class="arcade-container">
+    <header class="arcade-header">
+      <div class="score-board">
+        <span class="hud-label">1UP</span>
+        <span id="score-counter" class="hud-val">048200</span>
+      </div>
+      <div class="arcade-title">★ RETRO OPENCODE ★</div>
+      <div class="credit-board">
+        <span class="hud-label">CREDIT</span>
+        <span id="coin-counter" class="hud-val">02</span>
+      </div>
+    </header>
+
+    <div class="status-bar-row">
+      <div class="stat-pill"><span class="label">HP</span><div class="bar-outer"><div class="bar-inner hp-fill"></div></div><span class="stat-num">100%</span></div>
+      <div class="stat-pill"><span class="label">MP</span><div class="bar-outer"><div class="bar-inner mp-fill"></div></div><span class="stat-num">99</span></div>
+    </div>
+
+    <!-- AI Agent Dialogue Box with Syntax Highlighting -->
+    <div class="dialogue-box">
+      <div class="dialogue-speaker">
+        <span class="speaker-avatar">👾</span>
+        <span class="speaker-name">AGENT CHIP-16</span>
+      </div>
+      <div id="dialogue-text" class="dialogue-content">
+        Ready for quest! Insert prompt to command OpenCode agent:
+      </div>
+    </div>
+
+    <!-- Quick Action Macro Buttons -->
+    <div class="button-grid">
+      <button id="btn-coin" class="pixel-btn btn-gold">
+        <span>🪙 INSERT COIN</span>
+      </button>
+      <button id="btn-sound" class="pixel-btn btn-cyan">
+        <span>🔊 SOUND FX</span>
+      </button>
+      <button id="btn-boss" class="pixel-btn btn-magenta">
+        <span>⚔️ BOSS REFACTOR</span>
+      </button>
+      <button id="btn-start" class="pixel-btn btn-green">
+        <span>⚡ RUN AGENT</span>
+      </button>
+    </div>
+
+    <!-- Prompt Input Form -->
+    <div class="input-section">
+      <input type="text" id="arcade-prompt" placeholder="ENTER MISSION OBJECTIVE..." />
+      <button id="btn-send-prompt" class="btn-fire">FIRE!</button>
+    </div>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>`,
+    css: `* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  image-rendering: pixelated;
+}
+
+body.crt-screen {
+  background: #0f071c;
+  color: #00ffcc;
+  font-family: "Courier New", Courier, monospace, monospace;
+  font-size: 12px;
+  overflow: hidden;
+  height: 100vh;
+  position: relative;
+}
+
+body.crt-screen::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  z-index: 20;
+  background-size: 100% 3px, 4px 100%;
+  pointer-events: none;
+}
+
+.arcade-container {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.arcade-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #180d2e;
+  border: 2px solid #ff0077;
+  padding: 8px 12px;
+  box-shadow: 0 0 10px rgba(255, 0, 119, 0.4);
+}
+
+.arcade-title {
+  color: #ffd700;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px #ffd700;
+}
+
+.hud-label {
+  color: #ff0077;
+  font-weight: bold;
+  margin-right: 6px;
+}
+
+.hud-val {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.status-bar-row {
+  display: flex;
+  gap: 8px;
+}
+
+.stat-pill {
+  flex: 1;
+  background: #160b29;
+  border: 1px solid #00ffcc;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar-outer {
+  flex: 1;
+  height: 8px;
+  background: #251242;
+  border: 1px solid #334155;
+}
+
+.bar-inner {
+  height: 100%;
+}
+
+.hp-fill {
+  width: 100%;
+  background: #39ff14;
+  box-shadow: 0 0 6px #39ff14;
+}
+
+.mp-fill {
+  width: 90%;
+  background: #00bfff;
+  box-shadow: 0 0 6px #00bfff;
+}
+
+.stat-num {
+  font-size: 10px;
+  color: #ffd700;
+  font-weight: bold;
+}
+
+.dialogue-box {
+  background: #120824;
+  border: 2px solid #ffd700;
+  padding: 10px;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dialogue-speaker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ff0077;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.dialogue-content {
+  color: #f3e8ff;
+  line-height: 1.4;
+  font-size: 11px;
+}
+
+.button-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.pixel-btn {
+  padding: 8px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  border: 2px solid #000;
+  cursor: pointer;
+  box-shadow: 3px 3px 0px #000;
+  transition: transform 0.05s;
+}
+
+.pixel-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px #000;
+}
+
+.btn-gold { background: #ffd700; color: #120824; }
+.btn-cyan { background: #00ffcc; color: #120824; }
+.btn-magenta { background: #ff0077; color: #ffffff; }
+.btn-green { background: #39ff14; color: #120824; }
+
+.input-section {
+  display: flex;
+  gap: 6px;
+}
+
+.input-section input {
+  flex: 1;
+  background: #180d2e;
+  border: 2px solid #00ffcc;
+  color: #ffffff;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+}
+
+.btn-fire {
+  background: #ff0055;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  font-weight: bold;
+  padding: 8px 14px;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 2px 2px 0px #000;
+}
+
+.btn-fire:active {
+  transform: translate(2px, 2px);
+}
+`,
+    js: `// 16-Bit Retro Chiptune & Arcade HUD
+let score = 48200;
+let coins = 2;
+
+const audioCtx = typeof window !== 'undefined' ? new (window.AudioContext || window.webkitAudioContext)() : null;
+
+function playChiptuneBeep(freq = 440, type = 'square', duration = 0.1) {
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {
+    // audio policy
+  }
+}
+
+document.getElementById('btn-coin')?.addEventListener('click', () => {
+  coins++;
+  score += 100;
+  playChiptuneBeep(987.77, 'square', 0.15);
+  setTimeout(() => playChiptuneBeep(1318.51, 'square', 0.25), 100);
+  const coinEl = document.getElementById('coin-counter');
+  if (coinEl) coinEl.textContent = String(coins).padStart(2, '0');
+  const scoreEl = document.getElementById('score-counter');
+  if (scoreEl) scoreEl.textContent = String(score).padStart(6, '0');
+});
+
+document.getElementById('btn-sound')?.addEventListener('click', () => {
+  playChiptuneBeep(523.25, 'triangle', 0.1);
+  setTimeout(() => playChiptuneBeep(659.25, 'triangle', 0.1), 100);
+  setTimeout(() => playChiptuneBeep(783.99, 'triangle', 0.15), 200);
+  setTimeout(() => playChiptuneBeep(1046.50, 'square', 0.25), 300);
+});
+
+document.getElementById('btn-boss')?.addEventListener('click', () => {
+  playChiptuneBeep(220, 'sawtooth', 0.3);
+  const textEl = document.getElementById('dialogue-text');
+  if (textEl) {
+    textEl.innerHTML = '<span style="color:#ff0055">⚠ BOSS FIGHT:</span> Refactoring spaghetti code into pristine modular architecture! +1500 XP';
+  }
+  score += 1500;
+  const scoreEl = document.getElementById('score-counter');
+  if (scoreEl) scoreEl.textContent = String(score).padStart(6, '0');
+});
+
+document.getElementById('btn-send-prompt')?.addEventListener('click', () => {
+  const input = document.getElementById('arcade-prompt');
+  const val = input ? input.value.trim() : '';
+  if (!val) return;
+  playChiptuneBeep(880, 'square', 0.1);
+  const textEl = document.getElementById('dialogue-text');
+  if (textEl) {
+    textEl.innerHTML = '>> COMMAND DISPATCHED: <strong>' + val + '</strong>';
+  }
+  if (input) input.value = '';
+});
+`,
+    readme: `# 16-Bit Retro Arcade HUD for OpenChamber
+
+A nostalgic 16-bit arcade status display with CRT scanlines, pixel art stats, chiptune sound toggles, and OpenCode AI command badges.
 `,
   },
 };

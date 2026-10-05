@@ -393,6 +393,12 @@ Output strictly JSON (no markdown):
   "title": "Readable Extension Title",
   "description": "What this extension does",
   "version": "1.0.0",
+  "panel": {
+    "id": "my-extension-panel", // MUST be kebab-case, e.g. "my-extension-panel"
+    "title": "Readable Extension Title",
+    "entry": "panel/index.html",
+    "icon": "icon.svg"
+  },
   "permissions": ["session:read", "session:write", "project:read", "prompt:send", "notifications"],
   "html": "<!DOCTYPE html>...",
   "js": "...",
@@ -411,6 +417,21 @@ Output strictly JSON (no markdown):
     });
 
     const parsed = JSON.parse(response.text || '{}');
+    
+    // Enforce kebab-case panel.id
+    const baseName = (parsed.name || 'test-panel')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    const panelId = baseName.includes('panel') ? baseName : `${baseName}-panel`;
+    
+    parsed.panel = {
+      id: panelId,
+      title: parsed.title || 'OpenChamber Extension',
+      entry: 'panel/index.html',
+      icon: 'icon.svg',
+    };
+
     return res.json({ success: true, extension: parsed });
   } catch (error: any) {
     console.error('Error generating extension via Gemini:', error);

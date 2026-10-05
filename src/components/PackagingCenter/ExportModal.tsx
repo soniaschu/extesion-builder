@@ -12,14 +12,16 @@ import {
   Archive,
   ChevronRight
 } from 'lucide-react';
-import { VSCodeThemeConfig, IconThemeConfig, OpenChamberExtensionConfig } from '../../types';
+import { VSCodeThemeConfig, IconThemeConfig, OpenChamberExtensionConfig, OpenCodePluginConfig } from '../../types';
 import { 
   downloadVSCodeExtensionZip, 
   downloadOpenChamberZip, 
   downloadFullStudioBundle,
   downloadGitHubRepoZip,
-  downloadIconPackZip
+  downloadIconPackZip,
+  downloadOpenCodePluginZip
 } from '../../utils/zipExporter';
+import { generateThemeReadme, downloadReadmeFile } from '../../utils/readmeGenerator';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -27,6 +29,7 @@ interface ExportModalProps {
   theme: VSCodeThemeConfig;
   iconConfig: IconThemeConfig;
   extension: OpenChamberExtensionConfig;
+  plugin?: OpenCodePluginConfig;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
@@ -35,10 +38,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   theme,
   iconConfig,
   extension,
+  plugin,
 }) => {
   const [copiedSettings, setCopiedSettings] = React.useState(false);
   const [copiedThemeJson, setCopiedThemeJson] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<'packages' | 'snippets' | 'install'>('packages');
+  const [copiedReadme, setCopiedReadme] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<'packages' | 'snippets' | 'readme' | 'install'>('packages');
 
   if (!isOpen) return null;
 
@@ -114,6 +119,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             📦 Ready-to-Run Packages
           </button>
           <button
+            onClick={() => setActiveTab('readme')}
+            className={`py-2 px-3 text-xs font-medium border-b-2 transition ${
+              activeTab === 'readme'
+                ? 'border-cyan-400 text-cyan-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            📄 Automated README.md
+          </button>
+          <button
             onClick={() => setActiveTab('snippets')}
             className={`py-2 px-3 text-xs font-medium border-b-2 transition ${
               activeTab === 'snippets'
@@ -148,7 +163,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   <div>
                     <div className="font-semibold text-slate-200">{theme.displayName} Extension</div>
                     <div className="text-[11px] text-slate-400">
-                      Complete package with manifest, theme JSON, full SVG icons, and README.
+                      Complete package with color theme, matching vector icons bundled directly, and auto-activation.
                     </div>
                   </div>
                 </div>
@@ -170,7 +185,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   <div>
                     <div className="font-semibold text-slate-200">{extension.manifest.title}</div>
                     <div className="text-[11px] text-slate-400">
-                      OpenChamber SDK extension: manifest, index.html, main.js, style.css & icon.svg.
+                      OpenChamber SDK extension: manifest, index.html, main.js, style.css & themed icon.svg.
                     </div>
                   </div>
                 </div>
@@ -182,6 +197,30 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   <span>Download ZIP</span>
                 </button>
               </div>
+
+              {/* OpenCode Plugin Package (zenobi-us/opencode-plugin-template) */}
+              {plugin && (
+                <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-indigo-950 border border-indigo-800 flex items-center justify-center text-indigo-400 shrink-0">
+                      <Terminal className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-200">{plugin.title} (OpenCode Plugin)</div>
+                      <div className="text-[11px] text-slate-400">
+                        Based on <code className="text-indigo-300">zenobi-us/opencode-plugin-template</code>: package.json, hooks, tools & tests.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => downloadOpenCodePluginZip(plugin)}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center gap-1.5 shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download ZIP</span>
+                  </button>
+                </div>
+              )}
 
               {/* GitHub Repository Package */}
               <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
@@ -236,27 +275,74 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 </button>
               </div>
 
-              {/* Combined Bundle */}
+              {/* Combined Bundle with Nested ZIP Files */}
               <div className="p-3.5 rounded-lg bg-gradient-to-r from-cyan-950/40 via-indigo-950/40 to-fuchsia-950/40 border border-cyan-800/50 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 shrink-0">
                     <Archive className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-semibold text-slate-200">Combined ChamberCraft Suite</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold text-slate-200">Combined ChamberCraft Suite</div>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60">
+                        Individual Nested .ZIPs
+                      </span>
+                    </div>
                     <div className="text-[11px] text-slate-400">
-                      Everything in one archive: VS Code theme, icon set, and OpenChamber extension.
+                      Includes separate installation ZIPs inside: <code className="text-cyan-400">vscode-theme.zip</code>, <code className="text-emerald-400">openchamber-extension.zip</code>, <code className="text-indigo-400">opencode-plugin.zip</code>, and master README.
                     </div>
                   </div>
                 </div>
                 <button
-                  onClick={() => downloadFullStudioBundle(theme, iconConfig, extension)}
+                  onClick={() => downloadFullStudioBundle(theme, iconConfig, extension, plugin)}
                   className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-fuchsia-500 hover:from-cyan-400 hover:to-fuchsia-400 text-slate-950 font-bold transition flex items-center gap-1.5 shrink-0 shadow-lg shadow-cyan-950/50"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Download Bundle</span>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Dedicated README.md Tab */}
+          {activeTab === 'readme' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <div>
+                  <div className="font-semibold text-slate-200">Automated GitHub README.md</div>
+                  <div className="text-[11px] text-slate-400">
+                    Includes theme metadata, WCAG color swatches, setup instructions, and OpenCode plugin guides.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const md = generateThemeReadme(theme, { iconConfig, extension, plugin });
+                      navigator.clipboard.writeText(md);
+                      setCopiedReadme(true);
+                      setTimeout(() => setCopiedReadme(false), 2000);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition"
+                  >
+                    {copiedReadme ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedReadme ? 'Copied' : 'Copy Markdown'}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const md = generateThemeReadme(theme, { iconConfig, extension, plugin });
+                      downloadReadmeFile(md);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold flex items-center gap-1.5 transition"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Download README.md</span>
+                  </button>
+                </div>
+              </div>
+
+              <pre className="p-3 bg-slate-950 border border-slate-800 rounded-lg max-h-80 overflow-y-auto text-[11px] font-mono text-slate-300 whitespace-pre-wrap select-text leading-relaxed">
+                {generateThemeReadme(theme, { iconConfig, extension, plugin })}
+              </pre>
             </div>
           )}
 

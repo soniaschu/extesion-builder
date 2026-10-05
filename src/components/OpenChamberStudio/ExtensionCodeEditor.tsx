@@ -17,6 +17,8 @@ import {
   ChevronUp
 } from 'lucide-react';
 
+import { buildOpenChamberPackageJson, toKebabCase } from '../../utils/openchamberUtils';
+
 interface ExtensionCodeEditorProps {
   extension: OpenChamberExtensionConfig;
   onUpdateExtension: (updated: Partial<OpenChamberExtensionConfig>) => void;
@@ -49,29 +51,7 @@ export const ExtensionCodeEditor: React.FC<ExtensionCodeEditorProps> = ({
   const getFileContent = (tab: ExtensionFileTab): string => {
     switch (tab) {
       case 'package.json':
-        return JSON.stringify(
-          {
-            name: extension.manifest.name,
-            version: extension.manifest.version,
-            description: extension.manifest.description,
-            author: extension.manifest.author,
-            main: extension.manifest.entry,
-            openchamber: {
-              name: extension.manifest.name,
-              title: extension.manifest.title,
-              version: extension.manifest.version,
-              entry: extension.manifest.entry,
-              icon: extension.manifest.icon,
-              permissions: extension.manifest.permissions,
-              categories: extension.manifest.categories,
-            },
-            dependencies: {
-              '@openchamber/sdk': '^1.0.0',
-            },
-          },
-          null,
-          2
-        );
+        return JSON.stringify(buildOpenChamberPackageJson(extension), null, 2);
       case 'panel/index.html':
         return extension.html;
       case 'panel/main.js':
@@ -91,13 +71,22 @@ export const ExtensionCodeEditor: React.FC<ExtensionCodeEditorProps> = ({
         try {
           const parsed = JSON.parse(content);
           if (parsed.openchamber) {
+            const rawPanelId = parsed.openchamber.panel?.id || parsed.openchamber.name || 'test-panel';
+            const panelId = toKebabCase(rawPanelId, 'test-panel');
             onUpdateExtension({
               manifest: {
                 ...extension.manifest,
-                title: parsed.openchamber.title || extension.manifest.title,
+                name: toKebabCase(parsed.name || extension.manifest.name),
+                title: parsed.openchamber.panel?.title || parsed.openchamber.title || extension.manifest.title,
                 description: parsed.description || extension.manifest.description,
                 permissions: parsed.openchamber.permissions || extension.manifest.permissions,
                 version: parsed.version || extension.manifest.version,
+                panel: {
+                  id: panelId,
+                  title: parsed.openchamber.panel?.title || extension.manifest.title,
+                  entry: parsed.openchamber.panel?.entry || extension.manifest.entry,
+                  icon: parsed.openchamber.panel?.icon || extension.manifest.icon,
+                },
               },
             });
           }

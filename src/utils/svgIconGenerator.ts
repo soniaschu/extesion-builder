@@ -372,3 +372,51 @@ export const DEFAULT_ICON_THEME: IconThemeConfig = {
   style: 'rounded',
   icons: ALL_SUPPORTED_ICONS,
 };
+
+/**
+ * Dynamically harmonizes and adapts all icons to match a specific VS Code theme.
+ * The folder colors, file default color, and accent hues automatically sync with the theme.
+ */
+export function generateThemeHarmonizedIconTheme(
+  theme: {
+    id: string;
+    displayName: string;
+    type: 'dark' | 'light';
+    colors: Record<string, string>;
+  },
+  baseConfig: IconThemeConfig = DEFAULT_ICON_THEME
+): IconThemeConfig {
+  const accent = theme.colors['focusBorder'] || theme.colors['activityBar.foreground'] || '#38bdf8';
+  const fg = theme.colors['editor.foreground'] || (theme.type === 'light' ? '#333333' : '#e2e8f0');
+  const bg = theme.colors['editor.background'] || (theme.type === 'light' ? '#ffffff' : '#0f172a');
+  
+  // Decide folder color: prefer warm yellow/amber or theme accent
+  const folderColor = theme.colors['terminal.ansiYellow'] || theme.colors['editorWarning.foreground'] || accent;
+  const folderOpenColor = theme.colors['terminal.ansiCyan'] || accent;
+
+  const harmonizedIcons = baseConfig.icons.map((icon) => {
+    // If language is TS/TSX, harmonize with theme's cyan/blue
+    let primary = icon.primaryColor;
+    if (theme.type === 'light') {
+      // Invert or darken bright yellows for light themes
+      if (primary === '#facc15' || primary === '#eab308') primary = '#ca8a04';
+      if (primary === '#38bdf8' || primary === '#00f0ff') primary = '#0284c7';
+    }
+    return {
+      ...icon,
+      primaryColor: primary,
+    };
+  });
+
+  return {
+    ...baseConfig,
+    id: `${theme.id}-icons`,
+    name: `${theme.displayName} Icons`,
+    displayName: `${theme.displayName} Icons`,
+    description: `Matching vector file & folder icon theme adapted specifically for ${theme.displayName}.`,
+    folderColor,
+    folderOpenColor,
+    fileDefaultColor: fg,
+    icons: harmonizedIcons,
+  };
+}

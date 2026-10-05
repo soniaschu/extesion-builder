@@ -1,6 +1,9 @@
 import JSZip from 'jszip';
-import { VSCodeThemeConfig, IconThemeConfig, OpenChamberExtensionConfig, GitHubExportConfig } from '../types';
-import { buildIconThemePack } from './svgIconGenerator';
+import { VSCodeThemeConfig, IconThemeConfig, OpenChamberExtensionConfig, OpenCodePluginConfig, GitHubExportConfig } from '../types';
+import { buildIconThemePack, generateThemeHarmonizedIconTheme } from './svgIconGenerator';
+import { generateThemeReadme } from './readmeGenerator';
+import { buildOpenChamberPackageJson } from './openchamberUtils';
+import { buildProductIconThemePack } from './productIconGenerator';
 
 export function triggerBrowserDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -15,6 +18,8 @@ export function triggerBrowserDownload(blob: Blob, filename: string) {
 
 /**
  * Builds and downloads a ready-to-run VS Code Theme & Icon extension ZIP.
+ * The custom SVG icons are bundled directly inside the theme package, so installing
+ * the theme automatically installs and activates the matching icon pack.
  */
 export async function downloadVSCodeExtensionZip(
   theme: VSCodeThemeConfig,
@@ -22,8 +27,9 @@ export async function downloadVSCodeExtensionZip(
 ) {
   const zip = new JSZip();
   const rootDir = `${theme.id}-vscode`;
+  const activeIconConfig = iconConfig || generateThemeHarmonizedIconTheme(theme);
 
-  // VS Code package.json
+  // VS Code package.json contributing BOTH color theme AND matching icon theme
   const contributesThemes = [
     {
       label: theme.displayName,
@@ -32,15 +38,22 @@ export async function downloadVSCodeExtensionZip(
     },
   ];
 
-  const contributesIconThemes = iconConfig
-    ? [
-        {
-          id: iconConfig.id,
-          label: iconConfig.displayName,
-          path: './icons/icon-theme.json',
-        },
-      ]
-    : [];
+  const contributesIconThemes = [
+    {
+      id: activeIconConfig.id,
+      label: activeIconConfig.displayName,
+      path: './icons/icon-theme.json',
+    },
+  ];
+
+  const productThemeId = `${theme.id}-product-icons`;
+  const contributesProductThemes = [
+    {
+      id: productThemeId,
+      label: `${theme.displayName} Product & UI Icons`,
+      path: './product-icons/product-icon-theme.json',
+    },
+  ];
 
   const manifest = {
     name: theme.name.toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
@@ -52,10 +65,15 @@ export async function downloadVSCodeExtensionZip(
       vscode: '^1.85.0',
     },
     categories: ['Themes'],
-    keywords: ['theme', 'color-theme', 'dark-theme', 'syntax-highlighting', 'icons', 'openchamber'],
+    keywords: ['theme', 'color-theme', 'dark-theme', 'syntax-highlighting', 'icons', 'icon-theme', 'product-icons', 'openchamber'],
     contributes: {
       themes: contributesThemes,
-      ...(contributesIconThemes.length > 0 ? { iconThemes: contributesIconThemes } : {}),
+      iconThemes: contributesIconThemes,
+      productIconThemes: contributesProductThemes,
+      configurationDefaults: {
+        'workbench.iconTheme': activeIconConfig.id,
+        'workbench.productIconTheme': productThemeId,
+      },
     },
   };
 
@@ -72,14 +90,19 @@ export async function downloadVSCodeExtensionZip(
   };
   zip.file(`${rootDir}/themes/${theme.name}-color-theme.json`, JSON.stringify(colorThemeJson, null, 2));
 
-  // Icon pack
-  if (iconConfig) {
-    const pack = buildIconThemePack(iconConfig);
-    zip.file(`${rootDir}/icons/icon-theme.json`, pack.iconThemeJson);
-    Object.entries(pack.definitions).forEach(([fileName, svgContent]) => {
-      zip.file(`${rootDir}/icons/${fileName}`, svgContent);
-    });
-  }
+  // File & Folder SVG Icon pack
+  const pack = buildIconThemePack(activeIconConfig);
+  zip.file(`${rootDir}/icons/icon-theme.json`, pack.iconThemeJson);
+  Object.entries(pack.definitions).forEach(([fileName, svgContent]) => {
+    zip.file(`${rootDir}/icons/${fileName}`, svgContent);
+  });
+
+  // Product & Menu UI Icon theme (Transforms the entire VS Code UI)
+  const productPack = buildProductIconThemePack(theme);
+  zip.file(`${rootDir}/product-icons/product-icon-theme.json`, productPack.productIconThemeJson);
+  Object.entries(productPack.definitions).forEach(([fileName, svgContent]) => {
+    zip.file(`${rootDir}/product-icons/${fileName}`, svgContent);
+  });
 
   // README.md
   const readmeContent = `# ${theme.displayName}
@@ -133,25 +156,8 @@ export async function downloadOpenChamberZip(ext: OpenChamberExtensionConfig) {
   const zip = new JSZip();
   const rootDir = `${ext.manifest.name}-openchamber`;
 
-  // package.json with openchamber block
-  const packageJson = {
-    name: ext.manifest.name,
-    version: ext.manifest.version,
-    description: ext.manifest.description,
-    author: ext.manifest.author,
-    main: ext.manifest.entry,
-    openchamber: {
-      name: ext.manifest.name,
-      title: ext.manifest.title,
-      entry: ext.manifest.entry,
-      icon: ext.manifest.icon,
-      permissions: ext.manifest.permissions,
-      categories: ext.manifest.categories,
-    },
-    dependencies: {
-      '@openchamber/sdk': '^1.0.0',
-    },
-  };
+  // package.json with strictly valid openchamber block and kebab-case panel.id
+  const packageJson = buildOpenChamberPackageJson(ext);
 
   zip.file(`${rootDir}/package.json`, JSON.stringify(packageJson, null, 2));
   zip.file(`${rootDir}/panel/index.html`, ext.html);
@@ -274,18 +280,7 @@ export async function downloadGitHubRepoZip(
     const chamberDir = `${repoName}/openchamber-extension`;
     zip.file(
       `${chamberDir}/package.json`,
-      JSON.stringify(
-        {
-          name: ext.manifest.name,
-          version: ext.manifest.version,
-          description: ext.manifest.description,
-          main: ext.manifest.entry,
-          openchamber: ext.manifest,
-          dependencies: { '@openchamber/sdk': '^1.0.0' },
-        },
-        null,
-        2
-      )
+      JSON.stringify(buildOpenChamberPackageJson(ext), null, 2)
     );
     zip.file(`${chamberDir}/panel/index.html`, ext.html);
     zip.file(`${chamberDir}/panel/main.js`, ext.js);
@@ -480,25 +475,59 @@ echo "Repository published to https://github.com/${githubConfig.owner || 'userna
 }
 
 /**
- * Downloads a combined bundle with VS Code theme + OpenChamber extension.
+ * Builds and downloads a standalone OpenCode Plugin ZIP based on zenobi-us/opencode-plugin-template.
+ */
+export async function downloadOpenCodePluginZip(plugin: OpenCodePluginConfig) {
+  const zip = new JSZip();
+  const rootDir = plugin.name;
+
+  // package.json
+  zip.file(`${rootDir}/package.json`, plugin.files.packageJson);
+  // tsconfig.json
+  zip.file(`${rootDir}/tsconfig.json`, plugin.files.tsconfigJson);
+  // src/index.ts
+  zip.file(`${rootDir}/src/index.ts`, plugin.files.indexTs);
+  // src/tools/customTool.ts
+  zip.file(`${rootDir}/src/tools/customTool.ts`, plugin.files.customToolTs);
+  // tests/index.test.ts
+  zip.file(`${rootDir}/tests/index.test.ts`, plugin.files.testTs);
+  // README.md
+  zip.file(`${rootDir}/README.md`, plugin.files.readmeMd);
+
+  // .gitignore
+  zip.file(
+    `${rootDir}/.gitignore`,
+    `node_modules/
+dist/
+.DS_Store
+*.log
+`
+  );
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  triggerBrowserDownload(content, `${plugin.name}-opencode-plugin.zip`);
+}
+
+/**
+ * Downloads a combined bundle with individual nested installation ZIP packages:
+ * - vscode-theme.zip (individual zip for VS Code / Cursor installation)
+ * - openchamber-extension.zip (individual zip for OpenChamber SDK panel)
+ * - opencode-plugin.zip (individual zip based on zenobi-us/opencode-plugin-template)
+ * - standalone-icons.zip (individual zip with icon definitions)
+ * - README.md with extracted theme metadata, color swatches, contrast ratios, and guides
  */
 export async function downloadFullStudioBundle(
   theme: VSCodeThemeConfig,
   iconConfig: IconThemeConfig,
-  ext: OpenChamberExtensionConfig
+  ext: OpenChamberExtensionConfig,
+  plugin?: OpenCodePluginConfig
 ) {
-  const zip = new JSZip();
+  const masterZip = new JSZip();
   const rootDir = `chambercraft-${theme.id}-bundle`;
 
-  // VS Code extension inside vscode-theme/
-  const vscodeDir = `${rootDir}/vscode-theme`;
-  const contributesThemes = [
-    {
-      label: theme.displayName,
-      uiTheme: theme.type === 'dark' ? 'vs-dark' : 'vs',
-      path: `./themes/${theme.name}-color-theme.json`,
-    },
-  ];
+  // 1. Build individual VS Code Theme & Icons ZIP
+  const vscZip = new JSZip();
+  const vscRoot = `${theme.id}-vscode`;
   const manifest = {
     name: theme.name.toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
     displayName: theme.displayName,
@@ -508,48 +537,127 @@ export async function downloadFullStudioBundle(
     engines: { vscode: '^1.85.0' },
     categories: ['Themes'],
     contributes: {
-      themes: contributesThemes,
+      themes: [
+        {
+          label: theme.displayName,
+          uiTheme: theme.type === 'dark' ? 'vs-dark' : 'vs',
+          path: `./themes/${theme.name}-color-theme.json`,
+        },
+      ],
       iconThemes: [{ id: iconConfig.id, label: iconConfig.displayName, path: './icons/icon-theme.json' }],
     },
   };
-
-  zip.file(`${vscodeDir}/package.json`, JSON.stringify(manifest, null, 2));
-  zip.file(`${vscodeDir}/themes/${theme.name}-color-theme.json`, JSON.stringify({
-    name: theme.displayName,
-    type: theme.type,
-    colors: theme.colors,
-    tokenColors: theme.tokenColors,
-  }, null, 2));
-
+  vscZip.file(`${vscRoot}/package.json`, JSON.stringify(manifest, null, 2));
+  vscZip.file(
+    `${vscRoot}/themes/${theme.name}-color-theme.json`,
+    JSON.stringify(
+      {
+        name: theme.displayName,
+        type: theme.type,
+        colors: theme.colors,
+        tokenColors: theme.tokenColors,
+      },
+      null,
+      2
+    )
+  );
   const pack = buildIconThemePack(iconConfig);
-  zip.file(`${vscodeDir}/icons/icon-theme.json`, pack.iconThemeJson);
+  vscZip.file(`${vscRoot}/icons/icon-theme.json`, pack.iconThemeJson);
   Object.entries(pack.definitions).forEach(([f, c]) => {
-    zip.file(`${vscodeDir}/icons/${f}`, c);
+    vscZip.file(`${vscRoot}/icons/${f}`, c);
   });
+  vscZip.file(`${vscRoot}/README.md`, generateThemeReadme(theme, { iconConfig }));
+  const vscBlob = await vscZip.generateAsync({ type: 'uint8array' });
 
-  // OpenChamber Extension inside openchamber-extension/
-  const chamberDir = `${rootDir}/openchamber-extension`;
-  zip.file(`${chamberDir}/package.json`, JSON.stringify({
-    name: ext.manifest.name,
-    version: ext.manifest.version,
-    description: ext.manifest.description,
-    main: ext.manifest.entry,
-    openchamber: ext.manifest,
-    dependencies: { '@openchamber/sdk': '^1.0.0' },
-  }, null, 2));
-  zip.file(`${chamberDir}/panel/index.html`, ext.html);
-  zip.file(`${chamberDir}/panel/main.js`, ext.js);
-  zip.file(`${chamberDir}/panel/style.css`, ext.css);
-  zip.file(`${chamberDir}/icon.svg`, ext.svgIcon);
+  // 2. Build individual OpenChamber Extension ZIP
+  const chamberZip = new JSZip();
+  const chamberRoot = ext.manifest.name;
+  chamberZip.file(
+    `${chamberRoot}/package.json`,
+    JSON.stringify(buildOpenChamberPackageJson(ext), null, 2)
+  );
+  chamberZip.file(`${chamberRoot}/panel/index.html`, ext.html);
+  chamberZip.file(`${chamberRoot}/panel/main.js`, ext.js);
+  chamberZip.file(`${chamberRoot}/panel/style.css`, ext.css);
+  chamberZip.file(`${chamberRoot}/icon.svg`, ext.svgIcon);
+  chamberZip.file(`${chamberRoot}/README.md`, ext.readme || `# ${ext.manifest.title}\n\nOpenChamber SDK Extension`);
+  const chamberBlob = await chamberZip.generateAsync({ type: 'uint8array' });
 
-  // Bundle README
-  zip.file(`${rootDir}/README.md`, `# ChamberCraft Combined Suite
+  // 3. Build individual OpenCode Plugin ZIP (from zenobi-us/opencode-plugin-template)
+  let pluginBlob: Uint8Array | null = null;
+  if (plugin) {
+    const ocZip = new JSZip();
+    const ocRoot = plugin.name;
+    ocZip.file(`${ocRoot}/package.json`, plugin.files.packageJson);
+    ocZip.file(`${ocRoot}/tsconfig.json`, plugin.files.tsconfigJson);
+    ocZip.file(`${ocRoot}/src/index.ts`, plugin.files.indexTs);
+    ocZip.file(`${ocRoot}/src/tools/customTool.ts`, plugin.files.customToolTs);
+    ocZip.file(`${ocRoot}/tests/index.test.ts`, plugin.files.testTs);
+    ocZip.file(`${ocRoot}/README.md`, plugin.files.readmeMd);
+    pluginBlob = await ocZip.generateAsync({ type: 'uint8array' });
+  }
 
-Contains:
-1. **vscode-theme**: Complete VS Code theme & 30+ icon pack ready for VS Code / VSCodium / Cursor.
-2. **openchamber-extension**: Fully runnable OpenChamber extension following https://docs.openchamber.dev/sdk/.
-`);
+  // 4. Build individual Standalone Icons ZIP
+  const iconsZip = new JSZip();
+  iconsZip.file('icon-theme.json', pack.iconThemeJson);
+  Object.entries(pack.definitions).forEach(([f, c]) => {
+    iconsZip.file(`icons/${f}`, c);
+  });
+  const iconsBlob = await iconsZip.generateAsync({ type: 'uint8array' });
 
-  const content = await zip.generateAsync({ type: 'blob' });
-  triggerBrowserDownload(content, `chambercraft-complete-suite.zip`);
+  // Pack the individual installation ZIPs inside the master bundle
+  masterZip.file(`${rootDir}/packages/vscode-theme-and-icons.zip`, vscBlob);
+  masterZip.file(`${rootDir}/packages/openchamber-extension.zip`, chamberBlob);
+  if (pluginBlob) {
+    masterZip.file(`${rootDir}/packages/opencode-plugin.zip`, pluginBlob);
+  }
+  masterZip.file(`${rootDir}/packages/standalone-icons.zip`, iconsBlob);
+
+  // Master automated README.md
+  const masterReadme = generateThemeReadme(theme, {
+    iconConfig,
+    extension: ext,
+    plugin: plugin,
+  });
+  masterZip.file(`${rootDir}/README.md`, masterReadme);
+
+  // Quick automated installer shell script
+  const installSh = `#!/usr/bin/env bash
+set -e
+
+echo "📦 ChamberCraft Suite Installer"
+echo "--------------------------------"
+echo "Available installation packages:"
+echo " 1) VS Code Theme & Icons (packages/vscode-theme-and-icons.zip)"
+echo " 2) OpenChamber Extension (packages/openchamber-extension.zip)"
+${plugin ? 'echo " 3) OpenCode Plugin (packages/opencode-plugin.zip)"' : ''}
+echo " 4) Standalone Icons (packages/standalone-icons.zip)"
+echo ""
+
+# Unpack VS Code Extension into ~/.vscode/extensions/
+if [ -d "$HOME/.vscode/extensions" ]; then
+  echo "Installing VS Code Theme to ~/.vscode/extensions/${theme.name}..."
+  mkdir -p "$HOME/.vscode/extensions/${theme.name}"
+  unzip -q -o packages/vscode-theme-and-icons.zip -d /tmp/vsc-temp
+  cp -r /tmp/vsc-temp/*/* "$HOME/.vscode/extensions/${theme.name}/"
+  rm -rf /tmp/vsc-temp
+  echo "✅ VS Code Theme installed!"
+fi
+
+# Unpack OpenChamber extension if directory exists
+if [ -d "$HOME/.openchamber/extensions" ]; then
+  echo "Installing OpenChamber Extension to ~/.openchamber/extensions/${ext.manifest.name}..."
+  mkdir -p "$HOME/.openchamber/extensions/${ext.manifest.name}"
+  unzip -q -o packages/openchamber-extension.zip -d /tmp/oc-temp
+  cp -r /tmp/oc-temp/*/* "$HOME/.openchamber/extensions/${ext.manifest.name}/"
+  rm -rf /tmp/oc-temp
+  echo "✅ OpenChamber Extension installed!"
+fi
+
+echo "Done! See README.md for complete details."
+`;
+  masterZip.file(`${rootDir}/install.sh`, installSh);
+
+  const content = await masterZip.generateAsync({ type: 'blob' });
+  triggerBrowserDownload(content, `chambercraft-${theme.id}-bundle.zip`);
 }

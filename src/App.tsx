@@ -3,13 +3,16 @@ import {
   ActiveStudioMode, 
   VSCodeThemeConfig, 
   IconThemeConfig, 
-  OpenChamberExtensionConfig 
+  OpenChamberExtensionConfig,
+  OpenCodePluginConfig
 } from './types';
 import { THEME_PRESETS } from './data/presets';
-import { DEFAULT_ICON_THEME } from './utils/svgIconGenerator';
+import { DEFAULT_ICON_THEME, generateThemeHarmonizedIconTheme } from './utils/svgIconGenerator';
 import { OPENCHAMBER_TEMPLATES } from './data/openchamberTemplates';
+import { OPENCODE_PLUGIN_TEMPLATES } from './data/opencodePluginTemplates';
 import { adjustBrightness, getContrastRatio } from './utils/colorUtils';
 import { downloadVSCodeExtensionZip } from './utils/zipExporter';
+import { toKebabCase } from './utils/openchamberUtils';
 
 import { Navbar } from './components/Navbar';
 import { WorkbenchColorPicker } from './components/ThemeEditor/WorkbenchColorPicker';
@@ -18,20 +21,27 @@ import { ContrastAuditor } from './components/ThemeEditor/ContrastAuditor';
 import { VSCodeEditor } from './components/VSCodeSimulator/VSCodeEditor';
 import { OpenChamberWorkspace } from './components/OpenChamberStudio/OpenChamberWorkspace';
 import { ExtensionCodeEditor } from './components/OpenChamberStudio/ExtensionCodeEditor';
+import { OpenCodeWorkspace } from './components/OpenCodeStudio/OpenCodeWorkspace';
 import { IconPackStudio } from './components/IconThemeStudio/IconPackStudio';
 import { GitHubExportPanel } from './components/GitHubExport/GitHubExportPanel';
 import { ExportModal } from './components/PackagingCenter/ExportModal';
+import { ReadmeGeneratorModal } from './components/PackagingCenter/ReadmeGeneratorModal';
 import { AiThemeGeneratorModal } from './components/AiThemeGeneratorModal';
 import { AiThemeChatDrawer } from './components/AiAssistant/AiThemeChatDrawer';
 import { ProjectWorkflowModal } from './components/WorkflowWizard/ProjectWorkflowModal';
-import { MessageSquare, Sparkles, Check } from 'lucide-react';
+import { MessageSquare, Sparkles, Check, FileText } from 'lucide-react';
 
 export default function App() {
   const [activeMode, setActiveMode] = React.useState<ActiveStudioMode>('vscode-theme');
   const [currentTheme, setCurrentTheme] = React.useState<VSCodeThemeConfig>(THEME_PRESETS[0]);
-  const [iconConfig, setIconConfig] = React.useState<IconThemeConfig>(DEFAULT_ICON_THEME);
+  const [iconConfig, setIconConfig] = React.useState<IconThemeConfig>(() =>
+    generateThemeHarmonizedIconTheme(THEME_PRESETS[0], DEFAULT_ICON_THEME)
+  );
   const [openchamberExtension, setOpenchamberExtension] = React.useState<OpenChamberExtensionConfig>(
     OPENCHAMBER_TEMPLATES['prompt-booster']
+  );
+  const [opencodePlugin, setOpencodePlugin] = React.useState<OpenCodePluginConfig>(
+    OPENCODE_PLUGIN_TEMPLATES['tool-guard']
   );
 
   const [editorSubTab, setEditorSubTab] = React.useState<'workbench' | 'tokens'>('workbench');
@@ -39,6 +49,7 @@ export default function App() {
   const [isAiChatOpen, setIsAiChatOpen] = React.useState(false);
   const [isWorkflowModalOpen, setIsWorkflowModalOpen] = React.useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = React.useState(false);
+  const [isReadmeModalOpen, setIsReadmeModalOpen] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -46,12 +57,15 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Synchronize VS Code theme colors directly into OpenChamber extension variables
+  // Synchronize VS Code theme colors, matching icons, and OpenChamber extension variables
   const handleSyncThemeToOpenChamber = (themeToSync: VSCodeThemeConfig) => {
     const bg = themeToSync.colors['editor.background'] || '#0f131c';
     const text = themeToSync.colors['editor.foreground'] || '#e2e8f0';
     const accent = themeToSync.colors['focusBorder'] || themeToSync.colors['button.background'] || '#38bdf8';
     const border = themeToSync.colors['sideBarSectionHeader.background'] || '#1e2638';
+
+    // Firmly bind icons directly into the theme
+    setIconConfig((prev) => generateThemeHarmonizedIconTheme(themeToSync, prev));
 
     setOpenchamberExtension((prev) => {
       // Update custom css variables inside style.css
@@ -66,13 +80,34 @@ export default function App() {
         updatedCss = `:root {\n  --chamber-bg: ${bg};\n  --chamber-text: ${text};\n  --chamber-accent: ${accent};\n  --chamber-border: ${border};\n}\n` + updatedCss;
       }
 
+      // Update SVG icon strokes to match theme accent
+      const updatedSvg = prev.svgIcon
+        .replace(/stroke="currentColor"/g, `stroke="${accent}"`)
+        .replace(/stroke="[^"]*"/g, `stroke="${accent}"`);
+
+      // Ensure panel.id is strictly kebab-case
+      const baseName = prev.manifest.panel?.id || prev.manifest.name || 'test-panel';
+      const rawKebab = toKebabCase(baseName, 'test-panel');
+      const panelId = rawKebab.includes('panel') ? rawKebab : `${rawKebab}-panel`;
+
       return {
         ...prev,
         css: updatedCss,
+        svgIcon: updatedSvg,
+        manifest: {
+          ...prev.manifest,
+          name: toKebabCase(prev.manifest.name, 'openchamber-extension'),
+          panel: {
+            id: panelId,
+            title: prev.manifest.title,
+            entry: prev.manifest.entry || 'panel/index.html',
+            icon: 'icon.svg',
+          },
+        },
       };
     });
 
-    showToast(`Theme "${themeToSync.displayName}" adopted for OpenChamber Extension!`);
+    showToast(`Theme "${themeToSync.displayName}" & Icons fully synchronized!`);
   };
 
   // Workbench color updater
@@ -85,6 +120,9 @@ export default function App() {
           [key]: value,
         },
       };
+
+      // Automatically keep icons harmonized
+      setIconConfig((prevIcons) => generateThemeHarmonizedIconTheme(updatedTheme, prevIcons));
 
       // If user edits editor.background or focusBorder, automatically keep OpenChamber in sync
       if (key === 'editor.background' || key === 'focusBorder' || key === 'editor.foreground') {
@@ -137,15 +175,27 @@ export default function App() {
 
   const handleSelectPreset = (preset: VSCodeThemeConfig) => {
     setCurrentTheme(preset);
+    setIconConfig((prev) => generateThemeHarmonizedIconTheme(preset, prev));
+    handleSyncThemeToOpenChamber(preset);
   };
 
   const handleResetTheme = () => {
-    setCurrentTheme(THEME_PRESETS[0]);
+    const defaultTheme = THEME_PRESETS[0];
+    setCurrentTheme(defaultTheme);
+    setIconConfig(generateThemeHarmonizedIconTheme(defaultTheme, DEFAULT_ICON_THEME));
+    handleSyncThemeToOpenChamber(defaultTheme);
   };
 
   const handleSelectExtensionTemplate = (templateId: string) => {
     if (OPENCHAMBER_TEMPLATES[templateId]) {
       setOpenchamberExtension(OPENCHAMBER_TEMPLATES[templateId]);
+    }
+  };
+
+  const handleSelectPluginTemplate = (templateId: string) => {
+    if (OPENCODE_PLUGIN_TEMPLATES[templateId]) {
+      setOpencodePlugin(OPENCODE_PLUGIN_TEMPLATES[templateId]);
+      showToast(`Selected "${OPENCODE_PLUGIN_TEMPLATES[templateId].title}" template!`);
     }
   };
 
@@ -157,6 +207,13 @@ export default function App() {
         ...prev.manifest,
         ...(updated.manifest || {}),
       },
+    }));
+  };
+
+  const handleUpdatePlugin = (updated: Partial<OpenCodePluginConfig>) => {
+    setOpencodePlugin((prev) => ({
+      ...prev,
+      ...updated,
     }));
   };
 
@@ -188,6 +245,7 @@ export default function App() {
         onOpenAiChat={() => setIsAiChatOpen(true)}
         onOpenWorkflowModal={() => setIsWorkflowModalOpen(true)}
         onOpenExportModal={() => setIsExportModalOpen(true)}
+        onOpenReadmeModal={() => setIsReadmeModalOpen(true)}
         onResetTheme={handleResetTheme}
       />
 
@@ -281,7 +339,19 @@ export default function App() {
           </div>
         )}
 
-        {/* MODE 3: Icon Theme Pack Studio */}
+        {/* MODE 3: OpenCode Plugin Studio (zenobi-us/opencode-plugin-template) */}
+        {activeMode === 'opencode-plugin' && (
+          <div className="flex-1 flex overflow-hidden">
+            <OpenCodeWorkspace
+              plugin={opencodePlugin}
+              theme={currentTheme}
+              onUpdatePlugin={handleUpdatePlugin}
+              onSelectTemplate={handleSelectPluginTemplate}
+            />
+          </div>
+        )}
+
+        {/* MODE 4: Icon Theme Pack Studio */}
         {activeMode === 'icons' && (
           <div className="flex-1 flex overflow-hidden">
             <IconPackStudio
@@ -293,7 +363,7 @@ export default function App() {
           </div>
         )}
 
-        {/* MODE 4: GitHub Export Studio */}
+        {/* MODE 5: GitHub Export Studio */}
         {activeMode === 'github' && (
           <div className="flex-1 flex overflow-hidden">
             <GitHubExportPanel
@@ -319,12 +389,16 @@ export default function App() {
         isOpen={isAiChatOpen}
         onClose={() => setIsAiChatOpen(false)}
         onApplyTheme={(themeUpdates) => {
-          setCurrentTheme((prev) => ({
-            ...prev,
-            ...themeUpdates,
-            colors: { ...prev.colors, ...(themeUpdates.colors || {}) },
-            tokenColors: themeUpdates.tokenColors || prev.tokenColors,
-          }));
+          setCurrentTheme((prev) => {
+            const nextTheme = {
+              ...prev,
+              ...themeUpdates,
+              colors: { ...prev.colors, ...(themeUpdates.colors || {}) },
+              tokenColors: themeUpdates.tokenColors || prev.tokenColors,
+            };
+            setIconConfig((prevIcons) => generateThemeHarmonizedIconTheme(nextTheme, prevIcons));
+            return nextTheme;
+          });
         }}
         onApplyIcons={(iconUpdates) => {
           setIconConfig((prev) => ({
@@ -340,9 +414,13 @@ export default function App() {
         isOpen={isWorkflowModalOpen}
         onClose={() => setIsWorkflowModalOpen(false)}
         onSelectMode={(mode) => setActiveMode(mode)}
-        onApplyTheme={(selected) => setCurrentTheme(selected)}
+        onApplyTheme={(selected) => {
+          setCurrentTheme(selected);
+          setIconConfig((prev) => generateThemeHarmonizedIconTheme(selected, prev));
+        }}
         onSyncThemeToOpenChamber={handleSyncThemeToOpenChamber}
         onSelectExtensionTemplate={handleSelectExtensionTemplate}
+        onSelectPluginTemplate={handleSelectPluginTemplate}
       />
 
       {/* AI Theme & Extension Generator Modal */}
@@ -350,12 +428,16 @@ export default function App() {
         isOpen={isAiModalOpen}
         onClose={() => setIsAiModalOpen(false)}
         onApplyTheme={(themeUpdates) => {
-          setCurrentTheme((prev) => ({
-            ...prev,
-            ...themeUpdates,
-            colors: { ...prev.colors, ...(themeUpdates.colors || {}) },
-            tokenColors: themeUpdates.tokenColors || prev.tokenColors,
-          }));
+          setCurrentTheme((prev) => {
+            const nextTheme = {
+              ...prev,
+              ...themeUpdates,
+              colors: { ...prev.colors, ...(themeUpdates.colors || {}) },
+              tokenColors: themeUpdates.tokenColors || prev.tokenColors,
+            };
+            setIconConfig((prevIcons) => generateThemeHarmonizedIconTheme(nextTheme, prevIcons));
+            return nextTheme;
+          });
         }}
         onApplyExtension={(extUpdates) => {
           setOpenchamberExtension((prev) => ({
@@ -381,6 +463,17 @@ export default function App() {
         theme={currentTheme}
         iconConfig={iconConfig}
         extension={openchamberExtension}
+        plugin={opencodePlugin}
+      />
+
+      {/* Automated README.md Generator Modal */}
+      <ReadmeGeneratorModal
+        isOpen={isReadmeModalOpen}
+        onClose={() => setIsReadmeModalOpen(false)}
+        theme={currentTheme}
+        iconConfig={iconConfig}
+        extension={openchamberExtension}
+        plugin={opencodePlugin}
       />
     </div>
   );

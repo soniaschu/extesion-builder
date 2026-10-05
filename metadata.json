@@ -1,0 +1,6 @@
+{
+  "name": "ChamberCraft - VS Code & OpenChamber Studio",
+  "description": "Full-featured builder for VS Code Themes, Icon Packs, and OpenChamber SDK Extensions with live interactive simulator and instant packaging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
